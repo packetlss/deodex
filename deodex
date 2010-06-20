@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# generic deodex wrapper script for smali/baksmali
+# by packetlss
+#
+# usage: deodex <odex file> [framework dir] [BOOTCLASSPATH parameter]
+# 
+# framework directory is set to current dir if empty
+# BOOTCLASSPATH parameter is passed on to baksmali, use this to deodex stuff not using normal framework, i.e. HTC/Motorola stuff
+#
+# it handles jar/apk automatically
+# output lands in !complete_apk or !complete_jar directory in current directory
+#
+# files might have to be resigned to be usable
+#
+# examples:
+# $ deodex Vending.odex ../framework 
+# $ for arg in *.odex; do deodex $arg ../framework :javax.obex.jar; done 
+
+
+
+# fail on anything
+set -e
+trap on_exit EXIT
+
+# nuke tmp files if we fail
+function on_exit() {
+    rm -rf .tmp-$FILE out
+}
+
+# extract useful stuff
+FILE=$1
+EXT=${FILE##*.}
+NAME=${FILE/%.${EXT}/}
+
+# argument count
+if [ $# -lt 1 ]; then
+    echo "Usage: `basename $0` <odex file> [framework dir] [additional BOOTCLASSPATH]"
+    exit 255 
+fi
+
+# default framework path is current dir
+if [ "x$2" == "x" ]; then
+    FRAMEWORK=.
+else
+    FRAMEWORK=$2
+fi
+
+# handle extra BOOTCLASSPATH stuff
+if [ ! "x$3" == "x" ]; then
+    BCP=$3
+fi
+
+if [ -f $NAME.jar ]; then
+
+    echo -n "* deodexing $NAME.jar..."
+    
+    if [ ! -d !complete_jar ]; then
+        mkdir !complete_jar
+    fi
+
+    mkdir .tmp-$FILE
+
+    echo -n "unzipping..."
+    unzip -q -d .tmp-$FILE $NAME.jar
+
+    echo -n "baksmali..."
+    if [ ! "x$BCP" == "x" ]; then
+        baksmali -d $FRAMEWORK -c $BCP -x $NAME.odex
+    else
+        baksmali -d $FRAMEWORK -x $NAME.odex
+    fi
+
+    echo -n "smali..."
+    smali out -o .tmp-$FILE/classes.dex
+    
+    echo -n "zipping..."
+    cd .tmp-$FILE
+    zip -q -r ../!complete_jar/$NAME.jar .
+    cd .. 
+    
+    rm -rf .tmp-$FILE
+    rm -rf out
+    echo "done"
+
+elif [ -f $NAME.apk ]; then
+    echo -n "* deodexing $NAME.apk..."
+    
+    if [ ! -d !complete_apk ]; then
+        mkdir !complete_apk
+    fi
+    
+    mkdir .tmp-$FILE
+
+    echo -n "unzipping..."
+    unzip -q -d .tmp-$FILE $NAME.apk
+
+    echo -n "baksmali..."
+    if [ ! "x$BCP" == "x" ]; then
+        baksmali -d $FRAMEWORK -c $BCP -x $NAME.odex
+    else
+        baksmali -d $FRAMEWORK -x $NAME.odex
+    fi
+
+    echo -n "smalli..."
+    smali out -o .tmp-$FILE/classes.dex
+    
+    echo -n "zipping..."
+    cd .tmp-$FILE
+    zip -q -r ../!complete_apk/$NAME-unaligned.apk .
+    cd .. 
+    
+    echo -n "zipalign..."
+    zipalign -f 4 !complete_apk/$NAME-unaligned.apk !complete_apk/$NAME.apk
+    
+    rm -f !complete_apk/$NAME-unaligned.apk
+    rm -rf .tmp-$FILE
+    rm -rf out
+    
+    echo "done"
+
+else
+    echo "*** FAIL!11"
+
+fi
+
+

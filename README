@@ -1,0 +1,17 @@
+
+# generic deodex wrapper script for smali/baksmali
+# by packetlss
+#
+# usage: deodex <odex file> [framework dir] [BOOTCLASSPATH parameter]
+# 
+# framework directory is set to current dir if empty
+# BOOTCLASSPATH parameter is passed on to baksmali, use this to deodex stuff not using normal framework, i.e. HTC/Motorola stuff
+#
+# it handles jar/apk automatically
+# output lands in !complete_apk or !complete_jar directory in current directory
+#
+# files might have to be resigned to be usable
+#
+# examples:
+# $ deodex Vending.odex ../framework 
+# $ for arg in *.odex; do deodex $arg ../framework :javax.obex.jar; done 
